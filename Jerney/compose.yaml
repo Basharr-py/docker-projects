@@ -1,0 +1,85 @@
+
+services:
+    jerney_frontend:
+
+        restart: unless-stopped
+        image: jerney_frontend:latest
+        healthcheck:
+            test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/ || exit 1"]
+            interval: 100s
+            retries: 3
+            timeout: 3s
+        depends_on:
+            db:
+                condition: service_healthy
+        networks:
+            - frontend
+
+    jerney-backend:
+        healthcheck:
+#            test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+            interval: 100s
+            retries: 3
+            timeout: 3s
+        restart: unless-stopped
+        environment:
+            - DB_USER=${DB_USER}
+            - DB_PASSWORD=${DB_PASSWORD}
+            - DB_NAME=${DB_NAME}
+            - DB_PORT=${DB_PORT}
+            - DB_HOST=${DB_HOST}
+        image: jerner_backend:latest
+        networks:
+            - backend
+            - frontend
+        depends_on:
+            db:
+                condition: service_healthy
+        ports:
+            - 5000:5000
+
+    db:
+        healthcheck:
+            test: ["CMD", "pg_isready", "-U${DB_USER}", "-d${DB_NAME}"]
+            interval: 5s
+            retries: 3
+            timeout: 3s
+        restart: unless-stopped
+        environment:
+            - POSTGRES_USER=${DB_USER}
+            - POSTGRES_PASSWORD=${DB_PASSWORD}
+            - POSTGRES_NAME=${DB_NAME}
+            - POSTGRES_HOST=${DB_HOST}
+            - POSTGRES_PORT=${DB_PORT}
+        image: postgres:16
+        networks:
+            - backend
+        volumes:
+            - fast-db:/var/lib/postgresql/data
+
+    nginx:
+        image: nginx:alpine
+        restart: unless-stopped
+        healthcheck:
+            interval: 100s
+            retries: 3
+            timeout: 3s
+        depends_on:
+            db:
+                condition: service_healthy
+        volumes:
+            - ./frontend/nginx.conf:/etc/nginx/nginx.conf:ro
+        networks:
+            - frontend
+        ports:
+            - 80:80
+
+networks:
+    backend:
+        name: backend
+    frontend:
+        name: frontend
+
+volumes:
+    fast-db:
+        name: fast-db
