@@ -1,0 +1,72 @@
+services:
+#    frontend:
+#        image: frontend:1.1
+#        restart: unless-stopped
+#        healthcheck:
+#            interval: 100s
+#            retries: 3
+#            timeout: 3s
+#        ports:
+#            - 8000:80
+#        networks:
+#            - frontend
+#        depends_on:
+#            - backend
+
+    backend:
+        image: backend:1.0
+        restart: unless-stopped
+        healthcheck:
+            interval: 100s
+            retries: 3
+            timeout: 3s
+        networks:
+            - backend
+            - frontend
+        env_file: .env
+        depends_on:
+            db:
+                condition: service_healthy
+        ports:
+            - 8080:8080
+
+    db:
+        image: postgres:16
+        restart: unless-stopped
+        env_file: .env
+        environment:
+            - POSTGRES_DB=${DB_NAME}
+            - POSTGRES_USER=${DB_USER}
+            - POSTGRES_PASSWORD=${DB_PASSWORD}
+        volumes:
+            - pgdata:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - backend
+
+    nginx:
+        image: frontend:1.1
+        restart: unless-stopped
+        volumes:
+            - ./frontend/nginx1.conf:/etc/nginx/nginx.conf:ro
+        ports:
+            - 80:80
+        networks:
+            - frontend
+
+        depends_on:
+            db:
+                condition: service_healthy
+
+networks:
+    frontend:
+        name: frontend
+    backend:
+        name: backend
+
+volumes:
+    pgdata:
